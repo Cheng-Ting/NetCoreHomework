@@ -24,8 +24,10 @@ namespace webapi.Models
         public DateTime StartDate { get; set; }
         [Column("InstructorID")]
         public int? InstructorId { get; set; }
-        [Required]
         public byte[] RowVersion { get; set; }
+        [Column(TypeName = "datetime")]
+        public DateTime? DateModified { get; set; }
+        public bool IsDeleted { get; set; }
 
         [ForeignKey(nameof(InstructorId))]
         [InverseProperty(nameof(Person.Department))]

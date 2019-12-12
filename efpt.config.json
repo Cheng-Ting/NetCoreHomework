@@ -38,10 +38,6 @@
       },
       {
          "HasPrimaryKey": true,
-         "Name": "[dbo].[sysdiagrams]"
-      },
-      {
-         "HasPrimaryKey": true,
          "Name": "[dbo].[vwCourseStudentCount]"
       },
       {
