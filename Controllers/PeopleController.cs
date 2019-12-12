@@ -51,6 +51,10 @@ namespace webapi.Controllers
             {
                 return BadRequest();
             }
+            if (!PersonExists(id))
+            {
+                return NotFound();
+            }
 
             _context.Entry(person).State = EntityState.Modified;
 
@@ -59,15 +63,8 @@ namespace webapi.Controllers
                 await _context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
-            {
-                if (!PersonExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
+            { 
                     throw;
-                }
             }
 
             return NoContent();
@@ -89,11 +86,11 @@ namespace webapi.Controllers
         [HttpDelete("{id}")]
         public async Task<ActionResult<Person>> DeletePerson(int id)
         {
-            var person = await _context.Person.FindAsync(id);
-            if (person == null)
+            if (!PersonExists(id))
             {
                 return NotFound();
             }
+            var person = await _context.Person.FindAsync(id);
 
             // _context.Person.Remove(person);
             person.IsDeleted = true;
@@ -104,7 +101,7 @@ namespace webapi.Controllers
 
         private bool PersonExists(int id)
         {
-            return _context.Person.Any(e => e.Id == id);
+            return _context.Person.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

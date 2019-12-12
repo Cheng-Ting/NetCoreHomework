@@ -32,13 +32,11 @@ namespace webapi.Controllers
         [HttpGet("{id}")]
         public async Task<ActionResult<Department>> GetDepartment(int id)
         {
-            var department = await _context.Department.Where(d => !d.IsDeleted && d.DepartmentId == id).FirstOrDefaultAsync(d => d.DepartmentId == id);
-
-            if (department == null)
+            if (!DepartmentExists(id))
             {
                 return NotFound();
             }
-
+            var department = await _context.Department.FindAsync(id);
             return department;
         }
 
@@ -52,6 +50,10 @@ namespace webapi.Controllers
             {
                 return BadRequest();
             }
+            if (!DepartmentExists(id))
+            {
+                return NotFound();
+            }
 
             _context.Entry(department).State = EntityState.Modified;
 
@@ -61,14 +63,7 @@ namespace webapi.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!DepartmentExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                throw;
             }
 
             return CreatedAtAction("GetDepartment", new { id = department.DepartmentId }, department);
@@ -90,12 +85,11 @@ namespace webapi.Controllers
         [HttpDelete("{id}")]
         public async Task<ActionResult<Department>> DeleteDepartment(int id)
         {
-            var department = await _context.Department.FindAsync(id);
-            if (department == null)
+            if (!DepartmentExists(id))
             {
                 return NotFound();
             }
-
+            var department = await _context.Department.FindAsync(id);
             // _context.Department.Remove(department);
             department.IsDeleted = true;
             await _context.SaveChangesAsync();
@@ -108,7 +102,7 @@ namespace webapi.Controllers
         public async Task<ActionResult<IEnumerable<VwDepartmentCourseCount>>> GetCourseStudentCount()
         {
             var vwDepartmentCourseCount = await _context.VwDepartmentCourseCount
-                   .FromSqlRaw("SELECT * FROM [dbo].[VwDepartmentCourseCount]")
+                   .FromSqlRaw("SELECT * FROM [dbo].[VwDepartmentCourseCount] Where DepartmentID In (SELECT [DepartmentID] From [Department] Where [IsDeleted] = 0)")
                    .ToListAsync();
             return vwDepartmentCourseCount;
         }
@@ -117,6 +111,10 @@ namespace webapi.Controllers
         [HttpGet("CourseCount/{id}")]
         public async Task<ActionResult<VwDepartmentCourseCount>> GetCourseStudentCount(int id)
         {
+            if (!DepartmentExists(id))
+            {
+                return NotFound();
+            }
             var vwDepartmentCourseCount = await _context.VwDepartmentCourseCount
                    .FromSqlRaw("SELECT * FROM [dbo].[VwDepartmentCourseCount] Where DepartmentID = {0}",id)
                    .FirstAsync();
@@ -143,14 +141,14 @@ namespace webapi.Controllers
             {
                 return BadRequest();
             }
-            
-            Department oldDepartment = await _context.Department.FindAsync(id);
-            if (oldDepartment == null)
+            if (!DepartmentExists(id))
             {
                 return NotFound();
             }
+            Department oldDepartment = await _context.Department.FindAsync(id);
 
-            await _context.Database.ExecuteSqlInterpolatedAsync($" [dbo].[Department_Update] {id},{department.Name},{department.Budget},{department.StartDate},{department.InstructorId},{oldDepartment.RowVersion};");
+            await _context.Database
+                .ExecuteSqlInterpolatedAsync($"EXEC [dbo].[Department_Update] {id},{department.Name},{department.Budget},{department.StartDate},{department.InstructorId},{oldDepartment.RowVersion}; UPDATE [dbo].[Department] SET [DateModified] = {DateTime.Now} WHERE [DepartmentID] = {id}");
 
             return await _context.Department.FindAsync(id);
         }
@@ -159,20 +157,20 @@ namespace webapi.Controllers
         [HttpDelete("sp/{id}")]
         public async Task<ActionResult<Department>> DeleteDepartmentSP(int id)
         {
-            var department = await _context.Department.FindAsync(id);
-            if (department == null)
+            if (!DepartmentExists(id))
             {
                 return NotFound();
             }
-
-            await _context.Database.ExecuteSqlInterpolatedAsync($"EXEC [dbo].[Department_Delete] {id},{department.RowVersion};");
+            var department = await _context.Department.FindAsync(id);
+            await _context.Database
+                .ExecuteSqlInterpolatedAsync($"EXEC [dbo].[Department_Delete] {id},{department.RowVersion}; UPDATE [dbo].[Department] SET [DateModified] = {DateTime.Now} WHERE [DepartmentID] = {id}");
             
             return department;
         }
 
         private bool DepartmentExists(int id)
         {
-            return _context.Department.Any(e => e.DepartmentId == id);
+            return _context.Department.Any(e => e.DepartmentId == id && !e.IsDeleted);
         }
     }
 }

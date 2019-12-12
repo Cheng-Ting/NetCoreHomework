@@ -24,15 +24,14 @@ namespace webapi.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Course>>> GetCourse()
         {
-            return await _context.Course.ToListAsync();
+            return await _context.Course.Where(x => !x.IsDeleted).ToListAsync();
         }
 
         // GET: api/Courses/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Course>> GetCourse(int id)
         {
-            var course = await _context.Course.FindAsync(id);
-
+            var course = await _context.Course.Where(c => !c.IsDeleted && c.CourseId == id).FirstOrDefaultAsync(c=> c.CourseId == id);
             if (course == null)
             {
                 return NotFound();
@@ -51,6 +50,10 @@ namespace webapi.Controllers
             {
                 return BadRequest();
             }
+            if (!CourseExists(id))
+            {
+                return NotFound();
+            }
 
             _context.Entry(course).State = EntityState.Modified;
 
@@ -60,14 +63,7 @@ namespace webapi.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!CourseExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
+                throw;
             }
 
             return NoContent();
@@ -89,12 +85,13 @@ namespace webapi.Controllers
         [HttpDelete("{id}")]
         public async Task<ActionResult<Course>> DeleteCourse(int id)
         {
-            var course = await _context.Course.FindAsync(id);
-            if (course == null)
+            if (!CourseExists(id))
             {
                 return NotFound();
             }
-
+            
+            var course = await _context.Course.FindAsync(id);
+            
             //_context.Course.Remove(course);
             course.IsDeleted = true;
             await _context.SaveChangesAsync();
@@ -127,12 +124,19 @@ namespace webapi.Controllers
         [HttpGet("StudentsCount/{id}")]
         public async Task<ActionResult<IEnumerable<VwCourseStudentCount>>> GetCourseStudentCount(int id)
         {
-            return await _context.VwCourseStudentCount.Where(e => e.CourseId == id).ToListAsync();
+            if (!CourseExists(id))
+            {
+                return NotFound();
+            }
+            else
+            {
+                return await _context.VwCourseStudentCount.Where(e => e.CourseId == id).ToListAsync();
+            }
         }
 
         private bool CourseExists(int id)
         {
-            return _context.Course.Any(e => e.CourseId == id);
+            return _context.Course.Any(e => e.CourseId == id && !e.IsDeleted);
         }
     }
 }
